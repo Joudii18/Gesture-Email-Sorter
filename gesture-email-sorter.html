@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gesture Email Sorter</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e0e10;
+    --surface: #1a1a1e;
+    --surface2: #242428;
+    --border: rgba(255,255,255,0.08);
+    --accent: #c8f542;
+    --text: #f0f0ee;
+    --muted: #888884;
+    --radius: 12px;
+    --mono: 'Space Mono', monospace;
+    --display: 'Syne', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--display); min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 2rem 1rem; gap: 1.5rem; }
+
+  h1 { font-size: clamp(1.8rem, 5vw, 3rem); font-weight: 800; letter-spacing: -0.03em; }
+  h1 span { color: var(--accent); }
+  .subtitle { font-family: var(--mono); font-size: 12px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+
+  #main-area {
+    position: relative;
+    width: 100%;
+    max-width: 860px;
+    aspect-ratio: 16/9;
+    background: #111;
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  #webcam { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); opacity: 0; transition: opacity 0.5s; }
+  #canvas { position: absolute; inset: 0; width: 100%; height: 100%; transform: scaleX(-1); }
+
+  .zone {
+    position: absolute;
+    width: 30%;
+    height: 30%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px dashed rgba(255,255,255,0.2);
+    border-radius: 14px;
+    transition: all 0.2s;
+    pointer-events: none;
+    gap: 6px;
+  }
+  .zone-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    border: 2px solid transparent;
+    transition: all 0.2s;
+  }
+  .zone span { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+
+  .zone.tl { top: 5%; left: 2%; color: #9FE1CB; border-color: rgba(159,225,203,0.3); }
+  .zone.tl .zone-icon { background: rgba(29,158,117,0.15); border-color: rgba(29,158,117,0.3); }
+  .zone.tr { top: 5%; right: 2%; color: #B5D4F4; border-color: rgba(181,212,244,0.3); }
+  .zone.tr .zone-icon { background: rgba(55,138,221,0.15); border-color: rgba(55,138,221,0.3); }
+  .zone.bl { bottom: 5%; left: 2%; color: #F0997B; border-color: rgba(240,153,123,0.3); }
+  .zone.bl .zone-icon { background: rgba(216,90,48,0.15); border-color: rgba(216,90,48,0.3); }
+  .zone.br { bottom: 5%; right: 2%; color: #ED93B1; border-color: rgba(237,147,177,0.3); }
+  .zone.br .zone-icon { background: rgba(212,83,126,0.15); border-color: rgba(212,83,126,0.3); }
+
+  .zone.active { border-style: solid; border-width: 2px; }
+  .zone.tl.active { background: rgba(29,158,117,0.12); border-color: #1D9E75; }
+  .zone.tl.active .zone-icon { background: rgba(29,158,117,0.3); border-color: #1D9E75; transform: scale(1.1); }
+  .zone.tr.active { background: rgba(55,138,221,0.12); border-color: #378ADD; }
+  .zone.tr.active .zone-icon { background: rgba(55,138,221,0.3); border-color: #378ADD; transform: scale(1.1); }
+  .zone.bl.active { background: rgba(216,90,48,0.12); border-color: #D85A30; }
+  .zone.bl.active .zone-icon { background: rgba(216,90,48,0.3); border-color: #D85A30; transform: scale(1.1); }
+  .zone.br.active { background: rgba(212,83,126,0.12); border-color: #D4537E; }
+  .zone.br.active .zone-icon { background: rgba(212,83,126,0.3); border-color: #D4537E; transform: scale(1.1); }
+
+  #email-card {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 260px;
+    background: rgba(255,255,255,0.96);
+    border-radius: 12px;
+    padding: 18px;
+    color: #1a1a1e;
+    transition: all 0.38s cubic-bezier(0.4,0,0.2,1);
+    z-index: 10;
+  }
+  .email-from { font-family: var(--mono); font-size: 10px; color: #666; margin-bottom: 4px; }
+  .email-subject { font-family: var(--display); font-size: 13px; font-weight: 700; margin-bottom: 6px; line-height: 1.3; color: #111; }
+  .email-preview { font-size: 11px; color: #555; line-height: 1.5; font-family: var(--mono); }
+  .email-tag { display: inline-block; margin-top: 8px; font-family: var(--mono); font-size: 9px; background: #f1efe8; color: #888; border-radius: 4px; padding: 2px 7px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+  #email-card.fly-tl { transform: translate(-160%, -160%) scale(0.4); opacity: 0; }
+  #email-card.fly-tr { transform: translate(60%, -160%) scale(0.4); opacity: 0; }
+  #email-card.fly-bl { transform: translate(-160%, 60%) scale(0.4); opacity: 0; }
+  #email-card.fly-br { transform: translate(60%, 60%) scale(0.4); opacity: 0; }
+
+  #hold-ring {
+    position: absolute;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: none;
+  }
+
+  #gesture-hint {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.65);
+    color: rgba(255,255,255,0.7);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 5px 14px;
+    border-radius: 20px;
+    white-space: nowrap;
+    letter-spacing: 0.04em;
+  }
+
+  #action-toast {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.85);
+    color: #fff;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 16px;
+    padding: 10px 22px;
+    border-radius: 8px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    z-index: 20;
+    white-space: nowrap;
+  }
+
+  #camera-off {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    color: rgba(255,255,255,0.4);
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+  #camera-off svg { opacity: 0.4; }
+
+  /* STATS BAR */
+  #stats-bar {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    width: 100%;
+    max-width: 860px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    text-align: center;
+  }
+  .stat-card .val { font-size: 22px; font-weight: 800; color: var(--text); }
+  .stat-card .lbl { font-family: var(--mono); font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
+  .stat-card.tl-card .val { color: #9FE1CB; }
+  .stat-card.tr-card .val { color: #B5D4F4; }
+  .stat-card.bl-card .val { color: #F0997B; }
+  .stat-card.br-card .val { color: #ED93B1; }
+
+  /* LOG */
+  #folder-log {
+    width: 100%;
+    max-width: 860px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    max-height: 140px;
+    overflow-y: auto;
+  }
+  #folder-log::-webkit-scrollbar { width: 4px; }
+  #folder-log::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .log-empty { font-family: var(--mono); font-size: 12px; color: var(--muted); padding: 14px 16px; }
+  .log-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .log-row:last-child { border-bottom: none; }
+  .log-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .log-subject { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+  .log-folder { flex-shrink: 0; font-weight: 700; }
+
+  /* START BUTTON */
+  #start-btn {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--accent); color: #0e0e10;
+    border: none; border-radius: 8px;
+    padding: 10px 22px;
+    font-family: var(--display); font-size: 14px; font-weight: 700;
+    cursor: pointer; transition: all 0.15s;
+  }
+  #start-btn:hover { background: #d4ff50; transform: translateY(-1px); }
+
+  /* GMAIL NOTE */
+  .gmail-note {
+    width: 100%; max-width: 860px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+  .gmail-note b { color: var(--accent); font-weight: 700; }
+  .gmail-note a { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<h1>Gesture <span>Email</span> Sorter</h1>
+<p class="subtitle">Move your hand to a corner &bull; hold 1.5s &bull; email sorted</p>
+
+<div id="main-area">
+  <div id="camera-off">
+    <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+      <path d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/>
+    </svg>
+    <span>Camera not active</span>
+  </div>
+
+  <video id="webcam" autoplay playsinline muted></video>
+  <canvas id="canvas"></canvas>
+
+  <!-- ZONES -->
+  <div class="zone tl" id="z-tl">
+    <div class="zone-icon">
+      <svg width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+        <path d="M5 4h14a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1zM4 14h16M4 18h16"/>
+      </svg>
+    </div>
+    <span>Archive</span>
+  </div>
+
+  <div class="zone tr" id="z-tr">
+    <div class="zone-icon">
+      <svg width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+        <path d="M12 17.75l-6.172 3.245 1.179-6.873-4.993-4.867 6.9-1.002L12 2l3.086 6.253 6.9 1.002-4.993 4.867 1.179 6.873z"/>
+      </svg>
+    </div>
+    <span>Important</span>
+  </div>
+
+  <div class="zone bl" id="z-bl">
+    <div class="zone-icon">
+      <svg width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+        <path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 002 2h8a2 2 0 002-2l1-12M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"/>
+      </svg>
+    </div>
+    <span>Trash</span>
+  </div>
+
+  <div class="zone br" id="z-br">
+    <div class="zone-icon">
+      <svg width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+        <path d="M7 7h10M7 12h10M7 17h5M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"/>
+      </svg>
+    </div>
+    <span>Follow-up</span>
+  </div>
+
+  <!-- EMAIL CARD -->
+  <div id="email-card">
+    <div class="email-from" id="e-from">loading...</div>
+    <div class="email-subject" id="e-subject">—</div>
+    <div class="email-preview" id="e-preview">—</div>
+    <div class="email-tag" id="e-tag">inbox</div>
+  </div>
+
+  <!-- HOLD RING -->
+  <svg id="hold-ring" width="60" height="60">
+    <circle cx="30" cy="30" r="24" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="4"/>
+    <circle id="ring-arc" cx="30" cy="30" r="24" fill="none" stroke="#c8f542" stroke-width="4"
+      stroke-dasharray="150.8" stroke-dashoffset="150.8" stroke-linecap="round"
+      transform="rotate(-90 30 30)" style="transition: stroke-dashoffset 0.1s linear;"/>
+  </svg>
+
+  <div id="action-toast"></div>
+  <div id="gesture-hint">Point hand to a corner — hold 1.5s to sort</div>
+</div>
+
+<!-- START BUTTON -->
+<button id="start-btn" onclick="startCamera()">
+  <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
+  Enable camera
+</button>
+
+<!-- STATS -->
+<div id="stats-bar">
+  <div class="stat-card tl-card"><div class="val" id="cnt-arch">0</div><div class="lbl">Archived</div></div>
+  <div class="stat-card tr-card"><div class="val" id="cnt-imp">0</div><div class="lbl">Important</div></div>
+  <div class="stat-card bl-card"><div class="val" id="cnt-trash">0</div><div class="lbl">Trashed</div></div>
+  <div class="stat-card br-card"><div class="val" id="cnt-follow">0</div><div class="lbl">Follow-up</div></div>
+  <div class="stat-card"><div class="val" id="cnt-rem">5</div><div class="lbl">Remaining</div></div>
+</div>
+
+<!-- ACTIVITY LOG -->
+<div id="folder-log">
+  <div class="log-empty" id="log-empty">Sorted emails will appear here...</div>
+</div>
+
+<!-- GMAIL NOTE -->
+<div class="gmail-note">
+  <b>Connecting to real Gmail:</b> These are demo emails. To sort your real inbox, add your Gmail API
+  <code>access_token</code> at the top of this file and replace the <code>emails</code> array with a
+  <code>fetch</code> call to <code>https://gmail.googleapis.com/gmail/v1/users/me/messages</code>.
+  See the comments in the JS below for the exact lines to change.
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+<script>
+
+// ─────────────────────────────────────────────────────────
+//  GMAIL API CONNECTION (replace demo data with real inbox)
+//  1. Get your access_token from OAuth Playground or your backend
+//  2. Set ACCESS_TOKEN below
+//  3. Replace the `emails` array with the fetchEmails() call
+// ─────────────────────────────────────────────────────────
+const ACCESS_TOKEN = ''; // paste your token here
+
+async function fetchEmails() {
+  if (!ACCESS_TOKEN) return; // using demo data
+  const listRes = await fetch(
+    'https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=INBOX&maxResults=10',
+    { headers: { Authorization: 'Bearer ' + ACCESS_TOKEN } }
+  );
+  const list = await listRes.json();
+  const loaded = [];
+  for (const m of list.messages.slice(0,5)) {
+    const msgRes = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject`,
+      { headers: { Authorization: 'Bearer ' + ACCESS_TOKEN } }
+    );
+    const msg = await msgRes.json();
+    const headers = msg.payload.headers;
+    const from = headers.find(h=>h.name==='From')?.value || 'unknown';
+    const subject = headers.find(h=>h.name==='Subject')?.value || '(no subject)';
+    loaded.push({ id: m.id, from, subject, preview: msg.snippet });
+  }
+  emails.splice(0, emails.length, ...loaded);
+  idx = 0; loadEmail();
+}
+
+async function sortEmailGmail(emailId, folder) {
+  if (!ACCESS_TOKEN || !emailId) return;
+  const labelMap = { archive: {remove:['INBOX']}, important: {add:['IMPORTANT']}, trash: {add:['TRASH']}, 'follow-up': {add:['STARRED']} };
+  const mod = labelMap[folder] || {};
+  await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${emailId}/modify`, {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + ACCESS_TOKEN, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ addLabelIds: mod.add||[], removeLabelIds: mod.remove||[] })
+  });
+}
+// ─────────────────────────────────────────────────────────
+
+const emails = [
+  { from: 'boss@company.com', subject: 'Q3 review meeting — agenda attached', preview: 'Please review the attached agenda before our Monday sync. We need everyone prepared...', tag: 'work' },
+  { from: 'newsletter@techweekly.io', subject: 'This week in AI: 10 tools you need', preview: 'Sponsored content inside. Supercharge your workflow with these new AI tools...', tag: 'newsletter' },
+  { from: 'sarah@company.com', subject: 'Re: Design feedback on homepage', preview: 'Thanks for the notes! I updated the Figma file and left comments on your suggestions...', tag: 'work' },
+  { from: 'alerts@bank.com', subject: 'Your statement is ready', preview: 'Your May 2026 statement is now available to view online in your account...', tag: 'finance' },
+  { from: 'mike@client.com', subject: 'Follow up on proposal — urgent', preview: 'Hey, just wanted to circle back on the proposal we sent over last week...', tag: 'client' },
+];
+
+let idx = 0;
+const counts = { arch: 0, imp: 0, trash: 0, follow: 0 };
+const zoneMap = { tl: { folder: 'archive', key: 'arch', color: '#1D9E75', fly: 'fly-tl' },
+                  tr: { folder: 'important', key: 'imp', color: '#378ADD', fly: 'fly-tr' },
+                  bl: { folder: 'trash', key: 'trash', color: '#D85A30', fly: 'fly-bl' },
+                  br: { folder: 'follow-up', key: 'follow', color: '#D4537E', fly: 'fly-br' } };
+
+function loadEmail() {
+  if (idx >= emails.length) {
+    document.getElementById('e-from').textContent = '✓ All sorted!';
+    document.getElementById('e-subject').textContent = 'Inbox zero achieved';
+    document.getElementById('e-preview').textContent = 'Great job. Your inbox is empty.';
+    document.getElementById('e-tag').textContent = 'done';
+    document.getElementById('cnt-rem').textContent = '0';
+    return;
+  }
+  const e = emails[idx];
+  document.getElementById('e-from').textContent = e.from;
+  document.getElementById('e-subject').textContent = e.subject;
+  document.getElementById('e-preview').textContent = e.preview;
+  document.getElementById('e-tag').textContent = e.tag || 'inbox';
+  document.getElementById('cnt-rem').textContent = emails.length - idx;
+  const card = document.getElementById('email-card');
+  card.className = '';
+}
+
+loadEmail();
+fetchEmails(); // will no-op if no ACCESS_TOKEN
+
+let holdZone = null, holdStart = null, sorted = false;
+const HOLD_MS = 1500;
+
+function activateZone(zid) {
+  ['tl','tr','bl','br'].forEach(z => {
+    document.getElementById('z-'+z).classList.toggle('active', z === zid);
+  });
+}
+
+function triggerSort(zid) {
+  if (sorted || idx >= emails.length) return;
+  sorted = true;
+  const email = emails[idx];
+  const z = zoneMap[zid];
+  const card = document.getElementById('email-card');
+  card.classList.add(z.fly);
+  counts[z.key]++;
+  document.getElementById('cnt-'+z.key).textContent = counts[z.key];
+  showToast('→ ' + z.folder.charAt(0).toUpperCase() + z.folder.slice(1), z.color);
+  addLog(email.subject, z.folder, z.color);
+  sortEmailGmail(email.id, z.folder);
+  setTimeout(() => { idx++; sorted = false; loadEmail(); }, 420);
+}
+
+function showToast(msg, color) {
+  const t = document.getElementById('action-toast');
+  t.textContent = msg;
+  t.style.background = color + 'cc';
+  t.style.opacity = '1';
+  setTimeout(() => t.style.opacity = '0', 1300);
+}
+
+function addLog(subject, folder, color) {
+  document.getElementById('log-empty').style.display = 'none';
+  const log = document.getElementById('folder-log');
+  const row = document.createElement('div');
+  row.className = 'log-row';
+  row.innerHTML = `<div class="log-dot" style="background:${color}"></div>
+    <span class="log-subject">${subject}</span>
+    <span class="log-folder" style="color:${color}">${folder}</span>`;
+  log.prepend(row);
+}
+
+const holdRing = document.getElementById('hold-ring');
+const ringArc = document.getElementById('ring-arc');
+
+function updateHold(zid) {
+  if (!zid) { holdZone = null; holdStart = null; holdRing.style.display = 'none'; return; }
+  if (holdZone !== zid) { holdZone = zid; holdStart = Date.now(); }
+  const pct = Math.min((Date.now() - holdStart) / HOLD_MS, 1);
+  ringArc.style.strokeDashoffset = 150.8 * (1 - pct);
+  holdRing.style.display = 'block';
+  if (pct >= 1) { triggerSort(zid); holdZone = null; holdStart = null; holdRing.style.display = 'none'; }
+}
+
+let cameraStarted = false;
+function startCamera() {
+  if (cameraStarted) return;
+  cameraStarted = true;
+  document.getElementById('start-btn').style.display = 'none';
+  document.getElementById('camera-off').style.display = 'none';
+  initMediaPipe();
+}
+
+function initMediaPipe() {
+  const video = document.getElementById('webcam');
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  const hands = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+  hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.5 });
+
+  hands.onResults(results => {
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (results.multiHandLandmarks?.length) {
+      const lm = results.multiHandLandmarks[0];
+      drawConnectors(ctx, lm, HAND_CONNECTIONS, { color: 'rgba(200,245,66,0.45)', lineWidth: 2 });
+      drawLandmarks(ctx, lm, { color: '#c8f542', lineWidth: 1, radius: 3 });
+
+      const wrist = lm[0];
+      const nx = 1 - wrist.x;
+      const ny = wrist.y;
+      const TH = 0.32;
+
+      let zone = null;
+      if (nx < TH && ny < TH) zone = 'tl';
+      else if (nx > 1 - TH && ny < TH) zone = 'tr';
+      else if (nx < TH && ny > 1 - TH) zone = 'bl';
+      else if (nx > 1 - TH && ny > 1 - TH) zone = 'br';
+
+      activateZone(zone);
+      updateHold(zone);
+    } else {
+      activateZone(null);
+      updateHold(null);
+    }
+  });
+
+  const camera = new Camera(video, {
+    onFrame: async () => { await hands.send({ image: video }); },
+    width: 640, height: 360
+  });
+  camera.start().then(() => { video.style.opacity = '0.8'; });
+}
+</script>
+</body>
+</html>
