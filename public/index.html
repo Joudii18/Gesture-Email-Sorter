@@ -220,6 +220,19 @@
     cursor: pointer; transition: all 0.15s;
   }
   #start-btn:hover { background: #d4ff50; transform: translateY(-1px); }
+  #undo-btn {
+    display: flex; align-items: center; gap: 8px;
+    background: transparent; color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 22px;
+    font-family: var(--display); font-size: 14px; font-weight: 700;
+    cursor: pointer; transition: all 0.15s;
+  }
+  #undo-btn:hover { background: var(--surface2); }
+  @keyframes gesture-pop {
+    from { transform: translate(-50%,-50%) scale(0.4); opacity: 0; }
+    to { transform: translate(-50%,-50%) scale(1); opacity: 1; }
+  }
 
   /* GMAIL NOTE */
   .gmail-note {
@@ -307,14 +320,27 @@
   </svg>
 
   <div id="action-toast"></div>
-  <div id="gesture-hint">Point hand to a corner — hold 1.5s to sort</div>
+
+  <div id="gesture-indicator" style="
+    display:none; position:absolute; top:50%; left:50%;
+    transform:translate(-50%,-50%);
+    font-size:56px; z-index:25; pointer-events:none;
+    animation: gesture-pop 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  "></div>
+
+  <div id="gesture-hint">👍 sign in &nbsp;|&nbsp; point to corner to sort &nbsp;|&nbsp; 👎 undo</div>
+</div>
+
 </div>
 
 <!-- START BUTTON -->
-<button id="start-btn" onclick="startCamera()">
-  <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
-  Enable camera
-</button>
+<div style="display:flex;gap:10px;align-items:center;">
+  <button id="start-btn" onclick="startCamera()">
+    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
+    Enable camera
+  </button>
+  <button id="undo-btn" onclick="undoLastSort()" style="display:none;">↩ Undo last sort</button>
+</div>
 
 <!-- STATS -->
 <div id="stats-bar">
@@ -332,24 +358,44 @@
 
 <!-- GMAIL NOTE -->
 <div class="gmail-note">
-  <b>Connecting to real Gmail:</b> These are demo emails. To sort your real inbox, add your Gmail API
-  <code>access_token</code> at the top of this file and replace the <code>emails</code> array with a
-  <code>fetch</code> call to <code>https://gmail.googleapis.com/gmail/v1/users/me/messages</code>.
-  See the comments in the JS below for the exact lines to change.
+  <b>Connecting to real Gmail:</b> These are demo emails. Give a 👍 thumbs-up to sign in with
+  Google — once authorized, your real inbox loads automatically via the Gmail API.
 </div>
 
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
 <script>
 
 // ─────────────────────────────────────────────────────────
-//  GMAIL API CONNECTION (replace demo data with real inbox)
-//  1. Get your access_token from OAuth Playground or your backend
-//  2. Set ACCESS_TOKEN below
-//  3. Replace the `emails` array with the fetchEmails() call
+//  GMAIL API CONNECTION
+//  👍 thumbs-up triggers signIn(), which opens the Google
+//  sign-in popup (Google Identity Services) and exchanges
+//  it for a Gmail access_token, then loads the real inbox.
 // ─────────────────────────────────────────────────────────
-const ACCESS_TOKEN = ''; // paste your token here
+const CLIENT_ID = '898283385501-7omr4niu8ba150n64l2ar70s9k6ut9ta.apps.googleusercontent.com';
+let ACCESS_TOKEN = '';
+
+let tokenClient = null;
+
+function signIn() {
+  if (ACCESS_TOKEN) { showToast('Already signed in', '#378ADD'); return; }
+  if (typeof google === 'undefined') { showToast('Google sign-in still loading…', '#888884'); return; }
+  if (!tokenClient) {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: 'https://www.googleapis.com/auth/gmail.modify',
+      callback: (resp) => {
+        if (resp.error) { showToast('Sign-in failed', '#D85A30'); return; }
+        ACCESS_TOKEN = resp.access_token;
+        showToast('✓ Signed in to Gmail', '#1D9E75');
+        fetchEmails();
+      },
+    });
+  }
+  tokenClient.requestAccessToken();
+}
 
 async function fetchEmails() {
   if (!ACCESS_TOKEN) return; // using demo data
@@ -400,7 +446,7 @@ const zoneMap = { tl: { folder: 'archive', key: 'arch', color: '#1D9E75', fly: '
                   tr: { folder: 'important', key: 'imp', color: '#378ADD', fly: 'fly-tr' },
                   bl: { folder: 'trash', key: 'trash', color: '#D85A30', fly: 'fly-bl' },
                   br: { folder: 'follow-up', key: 'follow', color: '#D4537E', fly: 'fly-br' } };
-
+let sortHistory = [];
 function loadEmail() {
   if (idx >= emails.length) {
     document.getElementById('e-from').textContent = '✓ All sorted!';
@@ -437,13 +483,14 @@ function triggerSort(zid) {
   sorted = true;
   const email = emails[idx];
   const z = zoneMap[zid];
-  const card = document.getElementById('email-card');
-  card.classList.add(z.fly);
+  document.getElementById('email-card').classList.add(z.fly);
   counts[z.key]++;
   document.getElementById('cnt-'+z.key).textContent = counts[z.key];
   showToast('→ ' + z.folder.charAt(0).toUpperCase() + z.folder.slice(1), z.color);
-  addLog(email.subject, z.folder, z.color);
+  const logRow = addLog(email.subject, z.folder, z.color);
   sortEmailGmail(email.id, z.folder);
+  sortHistory.push({ email, zid, folder: z.folder, key: z.key, color: z.color, logRow });
+  document.getElementById('undo-btn').style.display = 'block';
   setTimeout(() => { idx++; sorted = false; loadEmail(); }, 420);
 }
 
@@ -464,6 +511,46 @@ function addLog(subject, folder, color) {
     <span class="log-subject">${subject}</span>
     <span class="log-folder" style="color:${color}">${folder}</span>`;
   log.prepend(row);
+  return row;
+}
+
+async function undoLastSort() {
+  if (!sortHistory.length || sorted) return;
+  const last = sortHistory.pop();
+  if (!sortHistory.length) document.getElementById('undo-btn').style.display = 'none';
+  idx--;
+  counts[last.key] = Math.max(0, counts[last.key] - 1);
+  document.getElementById('cnt-'+last.key).textContent = counts[last.key];
+  if (last.logRow && last.logRow.parentNode) last.logRow.parentNode.removeChild(last.logRow);
+  if (accessToken && last.email.id) {
+    const reverseMap = {
+      archive:     { addLabelIds: ['INBOX'], removeLabelIds: [] },
+      important:   { addLabelIds: [], removeLabelIds: ['IMPORTANT'] },
+      trash:       { addLabelIds: ['INBOX'], removeLabelIds: ['TRASH'] },
+      'follow-up': { addLabelIds: [], removeLabelIds: ['STARRED'] },
+    };
+    try {
+      await ensureFreshToken();
+      await fetch(SERVER + '/gmail/sort', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emailId: last.email.id, folder: '__reverse__', override: reverseMap[last.folder] }),
+      });
+    } catch(e) { console.error('Undo error:', e); }
+  }
+  showToast('↩ Undone', '#888884');
+  loadEmail();
+}
+
+function showGestureIndicator(emoji) {
+  const el = document.getElementById('gesture-indicator');
+  el.textContent = emoji;
+  el.style.display = 'block';
+  el.style.animation = 'none';
+  void el.offsetWidth;
+  el.style.animation = 'gesture-pop 0.3s cubic-bezier(0.34,1.56,0.64,1)';
+  clearTimeout(el._hide);
+  el._hide = setTimeout(() => el.style.display = 'none', 1200);
 }
 
 const holdRing = document.getElementById('hold-ring');
@@ -495,34 +582,57 @@ function initMediaPipe() {
   const hands = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
   hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.5 });
 
-  hands.onResults(results => {
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+ let lastGesture = null, gestureSince = null, gestureFired = false;
+const GESTURE_HOLD_MS = 800;
 
-    if (results.multiHandLandmarks?.length) {
-      const lm = results.multiHandLandmarks[0];
-      drawConnectors(ctx, lm, HAND_CONNECTIONS, { color: 'rgba(200,245,66,0.45)', lineWidth: 2 });
-      drawLandmarks(ctx, lm, { color: '#c8f542', lineWidth: 1, radius: 3 });
+function detectGesture(lm) {
+  const thumbTip  = lm[4];  const wrist     = lm[0];
+  const indexTip  = lm[8];  const indexPip  = lm[6];
+  const middleTip = lm[12]; const middlePip = lm[10];
+  const ringTip   = lm[16]; const ringPip   = lm[14];
+  const pinkyTip  = lm[20]; const pinkyPip  = lm[18];
+  const allCurled = indexTip.y > indexPip.y && middleTip.y > middlePip.y
+                 && ringTip.y  > ringPip.y  && pinkyTip.y  > pinkyPip.y;
+  if (allCurled && thumbTip.y < wrist.y - 0.12) return 'thumbs_up';
+  if (allCurled && thumbTip.y > wrist.y + 0.12) return 'thumbs_down';
+  return null;
+}
 
-      const wrist = lm[0];
-      const nx = 1 - wrist.x;
-      const ny = wrist.y;
-      const TH = 0.32;
+hands.onResults(results => {
+  canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!results.multiHandLandmarks?.length) {
+    activateZone(null); updateHold(null);
+    lastGesture = null; gestureSince = null; gestureFired = false;
+    return;
+  }
+  const lm = results.multiHandLandmarks[0];
+  drawConnectors(ctx, lm, HAND_CONNECTIONS, { color: 'rgba(200,245,66,0.45)', lineWidth: 2 });
+  drawLandmarks(ctx, lm, { color: '#c8f542', lineWidth: 1, radius: 3 });
 
-      let zone = null;
-      if (nx < TH && ny < TH) zone = 'tl';
-      else if (nx > 1 - TH && ny < TH) zone = 'tr';
-      else if (nx < TH && ny > 1 - TH) zone = 'bl';
-      else if (nx > 1 - TH && ny > 1 - TH) zone = 'br';
-
-      activateZone(zone);
-      updateHold(zone);
-    } else {
-      activateZone(null);
-      updateHold(null);
+  const gesture = detectGesture(lm);
+  if (gesture) {
+    if (gesture !== lastGesture) { lastGesture = gesture; gestureSince = Date.now(); gestureFired = false; }
+    if (Date.now() - gestureSince >= GESTURE_HOLD_MS && !gestureFired) {
+      gestureFired = true;
+      if (gesture === 'thumbs_up')   { showGestureIndicator('👍'); signIn(); }
+      if (gesture === 'thumbs_down') { showGestureIndicator('👎'); undoLastSort(); }
     }
-  });
+    activateZone(null); updateHold(null);
+    return;
+  }
+  lastGesture = null; gestureSince = null; gestureFired = false;
+  const wrist = lm[0];
+  const nx = 1 - wrist.x, ny = wrist.y, TH = 0.32;
+  let zone = null;
+  if (nx < TH && ny < TH) zone = 'tl';
+  else if (nx > 1 - TH && ny < TH) zone = 'tr';
+  else if (nx < TH && ny > 1 - TH) zone = 'bl';
+  else if (nx > 1 - TH && ny > 1 - TH) zone = 'br';
+  activateZone(zone); updateHold(zone);
+});
+
+   
 
   const camera = new Camera(video, {
     onFrame: async () => { await hands.send({ image: video }); },
