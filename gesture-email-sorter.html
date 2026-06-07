@@ -4,24 +4,26 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gesture Email Sorter</title>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #0e0e10;
     --surface: #1a1a1e;
     --surface2: #242428;
     --border: rgba(255,255,255,0.08);
-    --accent: #c8f542;
+    --accent: #FFA5C5;
     --text: #f0f0ee;
     --muted: #888884;
     --radius: 12px;
     --mono: 'Space Mono', monospace;
-    --display: 'Syne', sans-serif;
+    --display: 'Poppins', sans-serif;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--bg); color: var(--text); font-family: var(--display); min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 2rem 1rem; gap: 1.5rem; }
 
-  h1 { font-size: clamp(1.8rem, 5vw, 3rem); font-weight: 800; letter-spacing: -0.03em; }
+  h1 { font-size: clamp(1.8rem, 5vw, 3rem); font-weight: 600; letter-spacing: -0.03em; }
   h1 span { color: var(--accent); }
   .subtitle { font-family: var(--mono); font-size: 12px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
 
