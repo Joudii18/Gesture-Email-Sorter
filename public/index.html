@@ -397,15 +397,17 @@ function signIn() {
   tokenClient.requestAccessToken();
 }
 
-async function fetchEmails() {
+let nextPageToken = null;
+
+async function fetchEmails(pageToken = null) {
   if (!ACCESS_TOKEN) return; // using demo data
-  const listRes = await fetch(
-    'https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=INBOX&maxResults=10',
-    { headers: { Authorization: 'Bearer ' + ACCESS_TOKEN } }
-  );
+  let url = 'https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=INBOX&maxResults=20';
+  if (pageToken) url += '&pageToken=' + pageToken;
+  const listRes = await fetch(url, { headers: { Authorization: 'Bearer ' + ACCESS_TOKEN } });
   const list = await listRes.json();
+  nextPageToken = list.nextPageToken || null;
   const loaded = [];
-  for (const m of list.messages.slice(0,5)) {
+  for (const m of list.messages || []) {
     const msgRes = await fetch(
       `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject`,
       { headers: { Authorization: 'Bearer ' + ACCESS_TOKEN } }
@@ -416,8 +418,13 @@ async function fetchEmails() {
     const subject = headers.find(h=>h.name==='Subject')?.value || '(no subject)';
     loaded.push({ id: m.id, from, subject, preview: msg.snippet });
   }
-  emails.splice(0, emails.length, ...loaded);
-  idx = 0; loadEmail();
+  if (pageToken) {
+    emails.push(...loaded);
+  } else {
+    emails.splice(0, emails.length, ...loaded);
+    idx = 0;
+  }
+  loadEmail();
 }
 
 async function sortEmailGmail(emailId, folder) {
@@ -449,6 +456,10 @@ const zoneMap = { tl: { folder: 'archive', key: 'arch', color: '#1D9E75', fly: '
 let sortHistory = [];
 function loadEmail() {
   if (idx >= emails.length) {
+    if (nextPageToken) {
+      fetchEmails(nextPageToken);
+      return;
+    }
     document.getElementById('e-from').textContent = '✓ All sorted!';
     document.getElementById('e-subject').textContent = 'Inbox zero achieved';
     document.getElementById('e-preview').textContent = 'Great job. Your inbox is empty.';
@@ -522,7 +533,7 @@ async function undoLastSort() {
   counts[last.key] = Math.max(0, counts[last.key] - 1);
   document.getElementById('cnt-'+last.key).textContent = counts[last.key];
   if (last.logRow && last.logRow.parentNode) last.logRow.parentNode.removeChild(last.logRow);
-  if (accessToken && last.email.id) {
+  if (ACCESS_TOKEN && last.email.id) {
     const reverseMap = {
       archive:     { addLabelIds: ['INBOX'], removeLabelIds: [] },
       important:   { addLabelIds: [], removeLabelIds: ['IMPORTANT'] },
@@ -533,7 +544,7 @@ async function undoLastSort() {
       await ensureFreshToken();
       await fetch(SERVER + '/gmail/sort', {
         method: 'POST',
-        headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+        headers: { Authorization: 'Bearer ' + ACCESS_TOKEN, 'Content-Type': 'application/json' },
         body: JSON.stringify({ emailId: last.email.id, folder: '__reverse__', override: reverseMap[last.folder] }),
       });
     } catch(e) { console.error('Undo error:', e); }
