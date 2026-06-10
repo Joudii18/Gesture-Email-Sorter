@@ -7,7 +7,7 @@ const path = require('path');
 const app = express();
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public'))); // serve your HTML from /public
+app.use(express.static(path.join(__dirname))); // serve your HTML from /public
 
 // ── OAuth client (reads from .env) ──────────────────────────────────────────
 function getOAuthClient() {
