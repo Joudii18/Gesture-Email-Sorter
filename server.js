@@ -1,13 +1,27 @@
+console.log('step 1 - starting');
+process.on('uncaughtException', err => console.error('CRASH:', err));
+process.on('unhandledRejection', err => console.error('REJECTION:', err));
+
+console.log('step 2 - loading dotenv');
 require('dotenv').config();
+
+console.log('step 3 - loading express');
 const express = require('express');
+
+console.log('step 4 - loading googleapis');
 const { google } = require('googleapis');
+
+console.log('step 5 - loading cors and path');
 const cors = require('cors');
 const path = require('path');
 
+console.log('step 6 - creating app');
 const app = express();
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
-app.use(express.static(path.join(__dirname))); // serve your HTML from /public
+app.use(express.static(path.join(__dirname)));
+
+
 
 // ── OAuth client (reads from .env) ──────────────────────────────────────────
 function getOAuthClient() {

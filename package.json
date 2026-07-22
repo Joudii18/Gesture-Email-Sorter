@@ -21,7 +21,7 @@
   "homepage": "https://github.com/Joudii18/Gesture-Email-Sorter#readme",
   "dependencies": {
     "cors": "^2.8.6",
-    "dotenv": "^17.4.2",
+    "dotenv": "^16.4.5",
     "express": "^5.2.1",
     "googleapis": "^173.0.0"
   }
