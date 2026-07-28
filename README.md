@@ -119,7 +119,7 @@ Then open [http://localhost:3000](http://localhost:3000) in Chrome.
 
 ---
 
-## ☁️ Deploying to a live server (optional)
+## Deploying to a live server (optional)
 
 If you want to share this with others, the backend needs to be hosted somewhere. The frontend (HTML file) can go on GitHub Pages, but `server.js` needs a Node.js host.
 
@@ -143,7 +143,7 @@ https://your-deployed-server-url.com/auth/callback
 
 ---
 
-## 📁 Project structure
+## Project structure
 
 ```
 gesture-email-sorter/
