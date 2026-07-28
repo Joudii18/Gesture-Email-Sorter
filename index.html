@@ -368,12 +368,11 @@
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
 <script>
 
-// ─────────────────────────────────────────────────────────
 //  GMAIL API CONNECTION
 //  👍 thumbs-up triggers signIn(), which opens the Google
 //  sign-in popup (Google Identity Services) and exchanges
 //  it for a Gmail access_token, then loads the real inbox.
-// ─────────────────────────────────────────────────────────
+
 const CLIENT_ID = '898283385501-7omr4niu8ba150n64l2ar70s9k6ut9ta.apps.googleusercontent.com';
 const SERVER = 'https://gesture-email-sorter-production.up.railway.app';
 let ACCESS_TOKEN = '';
@@ -438,7 +437,6 @@ async function sortEmailGmail(emailId, folder) {
     body: JSON.stringify({ addLabelIds: mod.add||[], removeLabelIds: mod.remove||[] })
   });
 }
-// ─────────────────────────────────────────────────────────
 
 const emails = [
   { from: 'boss@company.com', subject: 'Q3 review meeting — agenda attached', preview: 'Please review the attached agenda before our Monday sync. We need everyone prepared...', tag: 'work' },
