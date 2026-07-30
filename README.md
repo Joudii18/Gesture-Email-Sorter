@@ -1,3 +1,7 @@
+
+
+https://github.com/user-attachments/assets/6d7cb855-20d8-489d-b007-a31d54d353bc
+
 # 💌 Gesture Email Sorter
 
 A gesture-controlled email sorter that uses your webcam to track hand movements and sort Gmail emails into folders — no keyboard or mouse needed.
