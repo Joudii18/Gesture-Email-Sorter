@@ -1,7 +1,3 @@
-
-
-https://github.com/user-attachments/assets/6d7cb855-20d8-489d-b007-a31d54d353bc
-
 # 💌 Gesture Email Sorter
 
 A gesture-controlled email sorter that uses your webcam to track hand movements and sort Gmail emails into folders — no keyboard or mouse needed.
@@ -11,9 +7,7 @@ Built with MediaPipe for hand tracking, Node.js + Express for the backend, and t
 ---
 
 ## 🎥 Demo
-
-<video src="https://github.com/Joudii18/Gesture-Email-Sorter/raw/main/demo.MP4" controls width="600"></video>
-
+https://github.com/user-attachments/assets/adec2b43-21d8-42ab-86c4-febd47056209
 > If the video doesn't play above, [click here to view it directly](https://github.com/Joudii18/Gesture-Email-Sorter/raw/main/demo.MP4).
 
 ---
