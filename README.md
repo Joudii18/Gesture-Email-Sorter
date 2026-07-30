@@ -6,6 +6,14 @@ Built with MediaPipe for hand tracking, Node.js + Express for the backend, and t
 
 ---
 
+## 🎥 Demo
+
+<video src="https://github.com/Joudii18/Gesture-Email-Sorter/raw/main/demo.MP4" controls width="600"></video>
+
+> If the video doesn't play above, [click here to view it directly](https://github.com/Joudii18/Gesture-Email-Sorter/raw/main/demo.MP4).
+
+---
+
 ## How it works
 
 - Move your hand to any corner of the screen and hold for 1.5 seconds to sort the current email
